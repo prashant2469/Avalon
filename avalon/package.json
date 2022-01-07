@@ -1,0 +1,12 @@
+{
+  "name": "avalon",
+  "description": "avalon",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "ejs": "^2.5.7",
+    "express": "^4.17.1",
+    "pug": "^2.0.0-rc.3",
+    "socket.io": "^2.0.3"
+  }
+}

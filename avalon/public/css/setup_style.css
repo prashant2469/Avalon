@@ -1,0 +1,21 @@
+
+span {
+	font-size: 60;
+}
+
+input {
+    font-size:60;
+    width: 100%;
+    height: 15%;
+    background: black;
+    color: white;
+    font-size: 10vh;
+}
+
+input[type=submit] {
+    border: none;
+    margin-top: 20px;
+    height: 20%;
+    background: green;
+    color: white;
+}

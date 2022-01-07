@@ -1,0 +1,43 @@
+  <html> 
+    <head> 
+        <link href="/css/setup_style.css" rel="stylesheet" type="text/css">
+  	<script> 
+  		window.onload = function() {
+  			document.getElementById("gameCode").value = Math.random().toString(36).substring(2,6);
+  		}
+
+  		function validateForm() {
+        document.forms["myForm"]["username"].value =document.forms["myForm"]["username"].value.toLowerCase().trim();
+        document.forms["myForm"]["gameCode"].value =document.forms["myForm"]["gameCode"].value.toLowerCase().trim();
+  			var username = document.forms["myForm"]["username"].value;
+  			var invalid = false;
+  			for(var i = 0; i < username.length; i++) {
+  				var character = username.charAt(i);
+  				if (!(character >= 'a' && character <= 'z')) {
+  					invalid = true;
+  					break;
+  				}
+  			}
+  			invalid = invalid || (username.length < 3 || username.length > 8);
+  			if (invalid) {
+        		alert("Name has to be between 3 and 8 characters long and must contain a-z");
+        		return false;
+    		}
+  		}
+
+  	</script>
+  </head> 
+
+ 	<title>Avalon</title>
+ 	<body> 
+		<form name="myForm" action="/join" onsubmit="return validateForm()">
+		  <span style="color:red"> username (required, 3-8 chars):<br> </span>
+		  <input type="text" id="name" name="username" value=""><br><br>
+		  <span style="color:red"> game code (required):<br> </span>
+		  <input type="text" id="gameCode" name="gameCode"><br><br>
+      <span> password (optional): </span> <br>
+      <input type="password" id="password" name="password"><br><br>
+		  <input type="submit" value="Join">
+		</form>
+ 	</body>
+ </html>

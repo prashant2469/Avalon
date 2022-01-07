@@ -1,0 +1,178 @@
+  <html> 
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js'></script>
+    <script> 
+    var socket = io();
+    var MIN_PLAYERS = 5;
+    var MAX_PLAYERS = 12;
+
+
+    function getUrlParameter(sParam) {
+        var sPageURL = decodeURIComponent(window.location.search.substring(1)),
+            sURLVariables = sPageURL.split('&'),
+            sParameterName,
+            i;
+
+        for (i = 0; i < sURLVariables.length; i++) {
+            sParameterName = sURLVariables[i].split('=');
+
+            if (sParameterName[0] === sParam) {
+                return sParameterName[1] === undefined ? true : sParameterName[1];
+            }
+        }
+    };
+
+    function addRoleToBox(roleName, goodOrBad) {
+       //var inputs = container.find('input');
+       container = $("#extraCharacters" + goodOrBad);
+       // $('<input />', { type: 'checkbox', id: id, value: name }).appendTo(container);
+
+           $('<input />', {
+              type : 'checkbox',
+              id: roleName,
+              name: roleName,
+              value: roleName,
+              checked: (roleName === 'merlin')
+          })
+            .appendTo(container);
+             $('<label />', { 'for': roleName, text: roleName }).appendTo(container);
+    }
+
+    function startNewGame() {
+       var username = getUrlParameter('username');
+       var gameCode = getUrlParameter('gameCode');
+
+
+       //determine if there are enough players
+       var playerCount =  $("#playerCount").text();
+       if(playerCount < MIN_PLAYERS || playerCount > MAX_PLAYERS) {
+        alert('player count is not between ' + MIN_PLAYERS + ' and ' + MAX_PLAYERS)
+       } else {
+         var specialsGood = [];
+         $('#extraCharactersGood :checked').each(function(){
+            specialsGood.push($(this).val());
+         });
+         var specialsBad = [];
+         $('#extraCharactersBad :checked').each(function(){
+            specialsBad.push($(this).val());
+         });
+
+         var extraInfo = $('#extraInfo').is(":checked");
+         var usingLadyOfLake = $('#ladyOfLake').is(":checked");
+
+
+         var numBad = specialsBad.length;
+         var numGood = specialsGood.length;
+
+         console.log(specialsGood);
+         console.log(specialsBad);
+
+
+         var maxBad = Math.ceil(playerCount/2) - 1; // one less than half
+
+         if(playerCount == 9) { //special case 6:3
+          maxBad = 3;
+         }
+
+         var maxGood = playerCount - maxBad; 
+
+         if(numBad > maxBad || numGood > maxGood) {
+          alert('You have selected too many good or bad characters. You can only have up to: ' + maxBad + ' bad chars and up to: ' + maxGood + ' chars');
+          return;
+         }
+
+          socket.emit('startGameButtonPressed', {
+            clicker: username,
+            gameCode: gameCode, 
+            specialsGood: specialsGood, 
+            specialsBad: specialsBad,
+            extraInfo: extraInfo, 
+            usingLadyOfLake: usingLadyOfLake
+          });
+       }
+    }
+      window.onload = function() {
+        var gameCode = getUrlParameter('gameCode');
+        var username = getUrlParameter('username');
+        socket.on('player join', function(data) {
+          if(data.gameCode == gameCode) {
+            console.log('a new player joined!');
+            $("#players").append("," + data.newPlayer);
+            var oldCount = parseInt($("#playerCount").text());
+            $("#playerCount").html(oldCount + 1);
+          }
+        });
+
+        socket.on('game started', function(data) {
+            if(gameCode == data.gameCode) {
+              if(data.error) {
+                alert('unexpected error: cannot start game');
+              } else {
+                window.location.href = '/game?username=' + username + '&gameCode=' + gameCode + '&extraInfo=' + data.extraInfo;
+              }
+            }
+        });
+        populatePlayersDiv(gameCode);
+        $("#message").html(username + " has joined game with code: " + gameCode)
+        var extraCharactersBad = ['mordred', 'oberon', 'morgana', 'assassin', 'vader'];
+        var extraCharactersGood = ['merlin', 'percival', 'lancelot', 'arthur']
+        extraCharactersGood.forEach(function(character) {
+          addRoleToBox(character, 'Good');
+        });  
+        extraCharactersBad.forEach(function(character) {
+          addRoleToBox(character, 'Bad');
+        });  
+      }
+
+      function populatePlayersDiv(gameCode) {
+        $.ajax({
+          url: "/gameLobby",
+          data: { 
+              "gameCode": gameCode
+          },
+          cache: false,
+          type: "GET",
+          success: function(response) {
+            $("#players").html(response.players.join());
+            $("#playerCount").html(response.players.length);
+          },
+          error: function(xhr) {
+            alert(xhr)
+          }
+       });
+      }
+    </script> 
+
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.2.1.min.js"></script>
+
+
+  <title>Avalon</title>
+  <p id = "message"> you are in the lobby </p>
+  <body> 
+    <div> Number of Players: <span id = "playerCount"> </span> </div>
+    <div>  List of Players: <span id = "players"> </span> </div>
+
+    <div id = "extraCharactersGood"> Extra Good Characters </div>
+    <div id = "extraCharactersBad"> Extra Bad Characters </div>
+
+    <input type="checkbox" id="extraInfo" name="extraInfo" value="enabled" checked>Display Mission Info <br>
+
+        <input type="checkbox" id="ladyOfLake" name="ladyOfLake" value="enabled">Lady of Lake<br>
+
+    <button type='submit' onclick = 'startNewGame()'>Start Game</button>
+
+    <div id="playersDescription">
+      GOOD GUYS <br/>
+      merlin: sees all bad guys except mordred <br/>
+      percival: sees merlin and morgana <br/>
+      arthur: appears as bad to bad guys <br/>
+      lancelot: appears as bad to merlin <br/>
+      servant: vanilla (doesn't know anything) <br/><br/>
+      BAD GUYS (all bad guys will see each other with some exceptions) <br/>
+      mordred: unknown to merlin <br/>
+      morgana: appears as merlin to percival <br/>
+      oberon: team doesn't know him, and he doesn't know his team <br/>
+      vader: must always vote fail in a mission <br/>
+      minion: vanilla (knows teammates) <br/>
+    </div>
+  </body>
+</html>

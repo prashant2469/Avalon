@@ -1,0 +1,805 @@
+<html> 
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
+        <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js'></script>
+    <link href="/css/style.css" rel="stylesheet" type="text/css">
+
+  	<script> 
+  		function toggleIdentity() {
+  			var button = document.getElementById('toggleIdentity');
+		    var welcomeMessage = document.getElementById('welcomeMessage');
+		    var dashboard = document.getElementById('dashboard');
+
+		    if (welcomeMessage.style.display === 'none') {
+		        welcomeMessage.style.display = 'block';
+		        button.innerHTML = 'Hide Identity';
+		    } else {
+		        welcomeMessage.style.display = 'none';
+		      	button.innerHTML = 'Show Identity';
+		    }
+		    dashboard.style.display = welcomeMessage.style.display;
+
+
+		}
+
+  		function addCheckbox(name) {
+		   var container = $('#listOfPlayersCheckbox');
+		   //var inputs = container.find('input');
+		   var id = name;
+
+		   console.log("adding box to " + id);
+
+		   // $('<input />', { type: 'checkbox', id: id, value: name }).appendTo(container);
+
+		       $('<input />', {
+			        type : 'checkbox',
+			        id: name,
+			        name: name,
+			        value: name,
+			        checked: false
+    			})
+    				.appendTo(container);
+
+    			   $('<label />', { 'for': name, text: name}).appendTo(container);
+
+
+		   // container
+		   //  .append(
+		   //     $(document.createElement('input')).attr({
+		   //         id:    'cb_'+id
+		   //        ,name:  id
+		   //        ,value: id
+		   //        ,type:  'checkbox' 
+		   //        ,text: id
+		   //     })
+    	// 	);
+		}
+
+		function updateBoardTiles(gameProgress, missionData) {
+			var extraInfo = getUrlParameter('extraInfo');
+
+			$("#boardState").html('');
+          	for(var i = 0; i < gameProgress.length; i++) {          			
+          		var text = '';
+          		var height = (extraInfo == 'true' ? 400 : 115) + 'px';
+          		if(i < missionData.length) {
+          			var currentMissionData = missionData[i];
+          			var voteText = formatDisplayPlayerVoteMap(currentMissionData.playerVoteMap, '\n');
+          			var text = '\n S: ' + currentMissionData.numSuccesses + ' F: ' + currentMissionData.numFails
+	          			 + '\n' + 'Players On: \n' + currentMissionData.playersChosen.join() +  ' \n chosen by: ' + currentMissionData.selector;
+          			if(extraInfo == 'true') {
+	          			text += '\n\n' + "Players Voted: \n" + voteText;
+	          		}
+          		}
+          		if(gameProgress[i] === 'S') {
+          			$("<div/>", {
+          				id: 'round-' + i, 
+          				'class': 'tile success', 
+          				text: 'Success' + text, 
+          				height: height
+          			})
+						.appendTo("#boardState")
+          		} else if(gameProgress[i] === 'F') {
+          			$("<div/>", {
+          				id: 'round-' + i, 
+          				'class': 'tile fail', 
+          				text: 'Fail' + text, 
+          				height: height
+          			})
+						.appendTo("#boardState")
+          		} else {
+          			$("<div/>", {
+          				id: 'round-' + i, 
+          				'class': 'tile not-reached', 
+          				text: gameProgress[i],
+          				height: height,
+          			})
+          			.css("line-height", height)
+					.appendTo("#boardState")
+          		}
+          	}
+		}
+
+		function updateRejectCountTiles(rejectCount) {
+			$("#rejectState").html('');
+          	for(var i = 0; i < 5; i++) {          			
+          		$("<div/>", {
+          				id: 'reject-' + i, 
+          				'class': 'rejectCountTile' + (i < rejectCount ? ' reached' : ''), 
+          				text: (i+1)
+          			})
+					.appendTo("#rejectState")
+          	}
+		}
+
+		function updateLadyTiles(playersHadLady, ladyHolder, turnOrder) {
+			$("#ladyState").html('');
+			
+          	for(var i = 0; i < turnOrder.length; i++) {
+          		var playerName = turnOrder[i];
+          		var suffix = '';
+          		if (playersHadLady.indexOf(playerName) != -1) {
+          			suffix = ' gray';
+          		} 
+          		if (playerName === ladyHolder) {
+          			suffix = ' green';
+          		}     			
+          		$("<div/>", {
+          				id: 'lady-' + i, 
+          				'class': 'ladyTile' + suffix
+          		})
+				.appendTo("#ladyState")
+          	}
+		}
+
+		function updateTurnOrderTiles(turnOrder, currentKing) {
+			$("#turnOrder").html('');
+          	for(var i = 0; i < turnOrder.length; i++) {          			
+          		$("<div/>", {
+          				id: 'turnOrder-' + i, 
+          				'class': 'turnOrderTile' + (turnOrder[i] === currentKing ? ' selected' : ''), 
+          				text: turnOrder[i]
+          			})
+					.appendTo("#turnOrder")
+          	}
+		}
+
+		function createNotes() {
+			$("#noteTiles").html('');
+          	for(var i = 0; i < 5; i++) {          			
+          		$("<div/>", {
+          				id: 'note-' + i, 
+          				'class': 'notesTile', 
+          				text: (i == 3 ? 'Requires two fails to fail' : '')
+          			})
+					.appendTo("#noteTiles")
+          	}
+		}
+
+
+		function formatDisplayPlayerVoteMap(playerVoteMap, delimiter) {
+			var res = '';
+			Object.keys(playerVoteMap)
+		    .sort()
+		    .forEach(function(prop, i) {
+	            if(playerVoteMap.hasOwnProperty(prop)) {
+					res += (prop + ":" + playerVoteMap[prop] + delimiter);
+				}
+       		});
+			return res;
+		}
+
+		function addRadioButton(name, container) {
+		   //var inputs = container.find('input');
+		   var id = name;
+
+		   console.log("adding box to " + id);
+
+		   // $('<input />', { type: 'checkbox', id: id, value: name }).appendTo(container);
+
+		       $('<input />', {
+			        type : 'radio',
+			        id: name,
+			        name: 'radio',
+			        value: name,
+			        checked: false
+    			})
+    				.appendTo(container);
+
+    			   $('<label />', { 'for': name, text: name }).appendTo(container);
+		}
+
+
+		function addRadioButtonToImage(name, container) {
+		   //var inputs = container.find('input');
+		   var id = name;
+
+		   console.log("adding box to " + id);
+
+		   // $('<input />', { type: 'checkbox', id: id, value: name }).appendTo(container);
+	   	    var span = $('<span/>', {
+	   	    	'class': 'image-radio'
+	   	    })
+	   	    	.appendTo(container);
+
+	       $('<input />', {
+		        type : 'radio',
+		        id: name,
+		        name: 'radio',
+		        value: name,
+		        checked: false
+			})
+	       		.css('display', 'none')
+				.appendTo(span);
+	   	    $('<img/>', {
+	   	    	src: '../assets/' + name.toLowerCase() + '.png'
+	   	    })
+	   	    	.css('border', '3px solid white')
+	   	    	.appendTo(span); 
+	   	    var opposite = {
+	   	    	'Approve':'Reject', 
+	   	    	'Reject':'Approve', 
+	   	    	'Success':'Fail', 
+	   	    	'Fail':'Success'
+	   	    }   
+
+		  	$(".image-radio img").click(function() {
+		  		var name = $(this).prev().attr('id');
+		  		$(this).css('border', '3px solid black');
+		  		var otherImg = opposite[name];
+		  		$("#" + otherImg).attr('checked', false);
+		  		$("#" + otherImg).next().css('border', '3px solid white');
+     			$(this).prev().attr('checked',true);
+ 			})    					
+		}
+
+
+	function getUrlParameter(sParam) {
+        var sPageURL = decodeURIComponent(window.location.search.substring(1)),
+            sURLVariables = sPageURL.split('&'),
+            sParameterName,
+            i;
+
+        for (i = 0; i < sURLVariables.length; i++) {
+            sParameterName = sURLVariables[i].split('=');
+
+            if (sParameterName[0] === sParam) {
+                return sParameterName[1] === undefined ? true : sParameterName[1];
+            }
+        }
+    };
+    	var turnOrder = null;
+    	function isInt(value) {
+  			return !isNaN(value) && (function(x) { return (x | 0) === x; })(parseFloat(value))
+		}
+		function confirmTeam() {
+		   console.log("confirm team button pressed");
+	       var username = getUrlParameter('username');
+	       var gameCode = getUrlParameter('gameCode');
+	       var chosen = [];
+	       // console.log(numPlayers);
+	       // for (var i = 0; i < turnOrder.length; i++) {
+	       // 	 var name = turnOrder[i];
+	       // 	 if ($('#'+name+':checked')) {
+	       // 	 	chosen.push(name);
+	       // 	 }
+	       // }
+	       var roundDivIds = [];
+	       var numPlayersOnMission;	
+	       for(var i = 0; i < 5; i++) {
+	       		var text = $("#round-"+i).text();
+	       		if(isInt(text)) {
+	       			numPlayersOnMission = parseInt(text);
+	       			break;
+	       		}
+	       };
+
+	       if(numPlayersOnMission === undefined) {
+	       	console.log('the number of players is undefined: ');
+	       	return;
+	       }
+
+	       $('#listOfPlayersCheckbox :checked').each(function(){
+	       		chosen.push($(this).val());
+	       });
+
+	        if(chosen.length != numPlayersOnMission) {
+	       		alert('You must choose ' + numPlayersOnMission + ' on the mission!');
+	        } else {
+		       $('#listOfPlayersCheckbox').html('');
+		       $('#confirmTeamButtonDiv').html('');
+		       socket.emit('confirmTeamButtonPressed', {clicker: username, gameCode: gameCode, chosen: chosen});
+		   }
+	    }
+
+	    function confirmVote() {
+		   console.log("confirm vote pressed");
+	       var username = getUrlParameter('username');
+	       var gameCode = getUrlParameter('gameCode');
+
+	       var vote = []
+	       $('#vote').find('[checked]').each(function() {
+	       		vote.push($(this).val());
+	       });
+	       if (vote.length != 1) {
+	       		alert("please approve or reject this mission.");
+	       		return;
+	       }
+	       vote = vote[0];
+	       console.log("vote was: " + vote);
+	       $('#vote').html('');
+	       $('#confirmVoteButtonDiv').html('');
+	       socket.emit('confirmVoteButtonPressed', {clicker: username, 
+	       	gameCode: gameCode, 
+	       	chosen: chosen, 
+	       	vote: vote});
+	    }
+
+	    function confirmMissionVote() {
+		   console.log("confirm mission vote pressed");
+	       var username = getUrlParameter('username');
+	       var gameCode = getUrlParameter('gameCode');
+	       var vote = [];
+	       $('#passFailVote').find('[checked]').each(function() {
+	       		vote.push($(this).val());
+	       });
+	       if (vote.length != 1) {
+	       		alert("please choose an option");
+	       		return;
+	       }
+	       vote = vote[0];
+	       console.log("vote was: " + vote);
+	       $('#passFailVote').html('');
+	       $('#confirmMissionVoteButtonDiv').html('');
+	       socket.emit('confirmMissionVoteButtonPressed', {
+	       	clicker: username, 
+	       	gameCode: gameCode, 
+	       	vote: vote
+	       });
+	    }
+
+	    //called after user confirms who to explore. 
+	    function confirmLadyVote() {
+	    	var candidate = []
+	    	var chooser = getUrlParameter('username');
+	    	var gameCode = getUrlParameter('gameCode');
+
+
+	       $('#ladyCandidateSelection :checked').each(function(){
+	       		candidate.push($(this).val());
+	       });
+	       if (candidate.length != 1) {
+	       		alert("please only select 1 lady candidate");
+	       		return;
+	       }
+
+	       $("#ladyCandidateSelection").html('');
+	       socket.emit('lady candidate chosen', {
+	       		candidate: candidate, 
+	       		gameCode: gameCode, 
+	       		chooser: chooser
+	       });
+
+	    }
+
+	    //called after user confirms who to explore. 
+	    function confirmMerlinKill() {
+	    	var candidate = []
+	    	var chooser = getUrlParameter('username');
+	    	var gameCode = getUrlParameter('gameCode');
+
+
+	       $('#chooseMerlin :checked').each(function(){
+	       		candidate.push($(this).val());
+	       });
+	       if (candidate.length != 1) {
+	       		alert("please only select 1 person to kill");
+	       		return;
+	       }
+	       var merlinChoice = candidate[0];
+	       socket.emit('merlin chosen', {merlinChoice: merlinChoice, gameCode: gameCode});
+	    }
+
+	    function showApproveReject(proposal) {
+			$("#chosen").html('the following players have been chosen:' + proposal.playersSelected.join() + ' by ' + proposal.selector + '.');
+            addRadioButtonToImage('Approve', $("#vote"));
+            addRadioButtonToImage('Reject', $("#vote"));
+            $('<button />', {
+			        type : 'submit',
+			        onclick: 'confirmVote()',
+			        text: 'Confirm Vote'
+    			})
+    			.appendTo($('#confirmVoteButtonDiv'));
+	    }
+
+
+        var socket = io();
+        window.onload = function() {
+            var username = "<%- username %>";
+		    var gameCode = "<%- gameCode %>";
+			socket.on('team confirmed', function(data) {
+				  if(gameCode != data.gameCode) {
+				  	return;
+				  } 
+		          console.log('team confirmed!');
+		          $("#votesForMission").html('');
+		          console.log('chosen team:' + data.chosen);
+		          //populateChosenDiv(data.gameCode, data.chosen);
+		          showApproveReject(data.proposal);
+		          // $("#players").append("," + data.newPlayer);
+		          // var oldCount = parseInt($("#playerCount").text());
+		          // $("#playerCount").html(oldCount + 1)
+		    });
+
+		    socket.on('lady user chosen', function(data) {
+		    	if(gameCode != data.gameCode) {
+		    		return;
+		    	}
+
+		    	//disable the choose team button for the current leader
+
+		    	if(username == data.currentUser) {
+		    		 if( $('#confirmTeamButton').length ) {
+		    		 	$("#confirmTeamButton").prop("disabled", true);
+		    		 }
+		    	}
+
+		    	if(username != data.user) {
+		    		$("#ladyInformation").html(data.user + ' is choosing who to explore using lady of the lake! Please do not move on to selecting mission until he has chosen. ');	
+		    		return;
+		    	} 
+
+		    	$("#ladyInformation").html('You control the lady of the lake, select which person you want to explore. Note: that person will be given the lady for next mission. ');	
+
+		    	data.candidatesToUseLady.forEach(function(candidate) {
+		    		addRadioButton(candidate, $("#ladyCandidateSelection"));
+		    	});
+
+				$('<button />', {
+			        type : 'submit',
+			        onclick: 'confirmLadyVote()',
+			        text: 'Confirm Player'
+				})
+				.appendTo($("#ladyCandidateSelection"));
+		    });
+
+		    socket.on('lady information', function(data) {
+		    	if(gameCode != data.gameCode) {
+		    		return;
+		    	}
+		    	console.log("who has it now: " + data.candidate + ", turnorder=" + data.turnOrder);
+		    	updateLadyTiles(data.playersHadLady, data.candidate, data.turnOrder);
+
+		  		if(username == data.currentUser) {
+		    		 if( $('#confirmTeamButton').length) {
+		    		 	$("#confirmTeamButton").prop("disabled", false);
+		    		 }
+		    	}
+
+
+		    	if(username != data.chooser) {
+		    		$("#ladyInformation").html(data.chooser + ' has found out about the team of ' + data.candidate + ', who now holds the lady');
+		    		return;
+		    	}
+
+		    	$("#ladyInformation").html('');
+
+		    	var message = '\n' + data.candidate + ' is on the ' + data.candidateTeam + ' team!';
+		    	alert(message);
+
+		    	$("#dashboard").append(' <br> ' + message);
+		    });
+
+
+
+		   	socket.on('choose merlin', function(data) {
+		   		if(gameCode != data.gameCode) {
+				  	return;
+				} 
+				updateBoardTiles(data.gameProgress, data.missionData);
+
+		   		console.log('username: ' + username + ' assassin: ' + data.assassin);
+				if(username === data.assassin) {
+					$("#chooseMerlin").html('Good guys have 3 passes. As the assassin, Who do you think is Merlin?');
+					var goodPlayers = data.goodPlayers;
+					goodPlayers.forEach(function(player) {
+						addRadioButton(player.name, $("#chooseMerlin"))
+					});
+
+					$('<button />', {
+				        type : 'submit',
+				        onclick: 'confirmMerlinKill()',
+				        text: 'Confirm Merlin Kill'
+					})
+					.appendTo($("#chooseMerlin"));
+ 				} else {
+					$("#turnInfo").html(data.assassin + ' is choosing who merlin is!');
+				}
+			});
+
+			socket.on('game over', function(data) {
+				if(gameCode != data.gameCode) {
+				  	return;
+				} 
+				//the game is over because of three minion fails, update the board for last mission
+				if(data.gameProgress) {
+					updateBoardTiles(data.gameProgress, data.missionData);
+				}
+				alert('The ' + data.winner + ' team won because ' + data.reason);
+			});
+
+		    //whenever the team is approved, show the 'success' and 'fail' buttons for the ppl on the team.
+
+		    function addMissionVotesIcons(chosen, playerVoteMap, players) {
+		    	$("#currentVotes").html('');
+				updateRejectCountTiles(0);
+				console.log('The team has been approved!');
+			    $("#chosen").html('the following players have been approved for the mission: ' + chosen.join() + '.');
+			    var voteText = formatDisplayPlayerVoteMap(playerVoteMap, ' <br> ');
+			    $("#votesForMission").html(voteText);
+
+			    var player;
+		        for (var j = 0; j < players.length; j++) {
+		        	if (players[j].name === username) {
+		      			player = players[j];
+		      			break;
+		      		}
+		      	}
+		     
+
+			    //$("#votesForMission").html(JSON.stringify(playerVoteMap));
+			    if(chosen.indexOf(username) != -1) {
+
+			      if (player.role != 'vader') {
+			      	addRadioButtonToImage('Success', $("#passFailVote"));
+			      }
+
+			      if (player.team === 'bad') { // only bad guys can vote success
+		          	addRadioButtonToImage('Fail', $("#passFailVote"));
+		              }
+
+			      if (player.team === 'good') { // good guys can see fail can vote success
+		          	addRadioButtonToImage('Fail-NoOp', $("#passFailVote"));
+		              }
+
+
+		          $('<button />', {
+					        type : 'submit',
+					        onclick: 'confirmMissionVote()',
+					        text: 'Confirm Mission Vote'
+		    			})
+		    			.appendTo($('#confirmMissionVoteButtonDiv'));
+		         }
+		    }
+		    socket.on('team approved', function(data) {
+		    	if(gameCode != data.gameCode) {
+				  	return;
+				} 
+				addMissionVotesIcons(data.chosen, data.playerVoteMap, data.players);
+			});
+
+			socket.on('team rejected', function(data) {
+				if(gameCode != data.gameCode) {
+				  	return;
+				} 
+				$("#currentVotes").html('');
+				updateRejectCountTiles(data.rejectCount);
+				console.log('The team has been rejected...');
+				var playerVoteMap = data.playerVoteMap;
+
+				// $('#turnInfo').html("it is currently <b> " + data.currentUser + "</b> 's turn \n. The turn order is " + data.game.turnOrder.toString()); // + ' There are currently ' + data.rejectCount + ' reject(s) in a row (5 for bad guy win)');
+			    //$("#votesForMission").html(JSON.stringify(playerVoteMap));
+			    var voteText = formatDisplayPlayerVoteMap(playerVoteMap, ' <br> ');
+			    $("#votesForMission").html(voteText);
+
+			    $("#chosen").html('the following players have been rejected for the mission: ' + data.chosen.join() + '.');
+
+			    updateTurnOrderTiles(data.game.turnOrder, data.currentUser);
+
+			    if (data.currentUser == username) {
+
+		          		// give checkboxes
+		          		$('#playerSelection').html('it is your turn.')
+		          		for (var i = 0; i < data.game.turnOrder.length; i++) {
+		          			console.log("adding");
+		          			addCheckbox(data.game.turnOrder[i]);
+		          		}
+
+		          		// give confirm button
+				       $('<button />', {
+					        type : 'submit',
+					        onclick: 'confirmTeam()',
+					        text: 'Confirm Team'
+		    			})
+		    			.appendTo($('#confirmTeamButtonDiv'));
+
+    			   
+		          		//<button type='submit' onclick = 'confirmTeam()'>Confirm Team</button>
+		          	} else {
+		          		$('#playerSelection').html('')
+
+		          	}
+
+			});
+
+			socket.on('new player voted', function(data) {
+				if(gameCode != data.gameCode) {
+				  	return;
+				} 
+				var notVoted = data.notVoted;
+				$("#currentVotes").html('People who need to vote: ' + notVoted.toString());
+			});
+
+			socket.on('mission completed', function(data) {
+				if(gameCode != data.gameCode) {
+				  	return;
+				} 
+				$("#chosen").html('');
+			    $("#votesForMission").html('');
+				
+				// $('#previousMissionInfo').html('The previous mission of ' + data.chosen + ' chosen by ' + data.chooser + ' was a ' + (data.missionPassed ? 'SUCCESS' : 'FAILURE') + ' with ' + data.numSuccesses + ' successes and ' + data.numFails + ' fails.');
+
+				// $('#turnInfo').html("it is currently <b> " + data.currentUser + " </b> 's turn. The turn order is " + data.game.turnOrder.toString());
+
+				var rightDiv;
+				for(var i = 0; i < 5; i++) {
+		       		var div = $("#round-"+i);
+		       		if(isInt(div.text())) {
+		       			rightDiv = div;
+		       			break;
+		       		}
+	       		};
+
+
+				updateBoardTiles(data.gameProgress, data.missionData);
+				updateTurnOrderTiles(data.game.turnOrder, data.currentUser);
+				//$('#round-'+(data.prevRound-1)).html(data.missionPassed ? 'S' : 'F');
+
+			    if (data.currentUser == username) {
+
+		          		// give checkboxes
+		          		$('#playerSelection').html('it is your turn.')
+		          		for (var i = 0; i < data.game.turnOrder.length; i++) {
+		          			console.log("adding");
+		          			addCheckbox(data.game.turnOrder[i]);
+		          		}
+
+		          		// give confirm button
+				       $('<button />', {
+					        type : 'submit',
+					        onclick: 'confirmTeam()',
+					        text: 'Confirm Team', 
+					        id: 'confirmTeamButton'
+		    			})
+		    			.appendTo($('#confirmTeamButtonDiv'));
+
+    			   
+		          		//<button type='submit' onclick = 'confirmTeam()'>Confirm Team</button>
+		          	} else {
+		          		$('#playerSelection').html('')
+		          	}
+
+			});
+
+
+
+		     $.ajax({
+		          url: "/gameInfo",
+		          data: { 
+		              gameCode: gameCode,
+		              username: username
+		          },
+		          cache: false,
+		          type: "GET",
+		          success: function(response) {
+		          	//what to do with the data we get back
+		          	var message ='You (' + username + ") are " + response.payload.player.role + ' on the ' + response.payload.player.team + ' team.';
+		          	$("#welcomeMessage").html(message);
+		          	$("#dashboard").html(response.payload.knowledge);
+		          	$("#whoIsInGame").html('<strong>Good</strong>: ' + response.payload.goodChars.toString() + ' <br/><strong>Bad</strong>: ' + response.payload.badChars.toString());
+		          	// $('#turnInfo').html("it is currently " + response.payload.currentKing + "'s turn. The turn order is " + response.payload.turnOrder.toString());
+
+		          	turnOrder = response.payload.turnOrder;
+
+		          	var numPlayers = response.payload.numPlayers;
+		            if (numPlayers >= 7) {
+		          		createNotes();
+		          	}
+
+		          	if (response.payload.currentKing == username) {
+
+		          		// give checkboxes
+		          		$('#playerSelection').html('it is your turn.')
+		          		for (var i = 0; i < response.payload.turnOrder.length; i++) {
+		          			console.log("adding");
+		          			addCheckbox(response.payload.turnOrder[i]);
+		          		}
+
+		          		// give confirm button
+				       $('<button />', {
+					        type : 'submit',
+					        onclick: 'confirmTeam()',
+					        text: 'Confirm Team'
+		    			})
+		    			.appendTo($('#confirmTeamButtonDiv'));
+
+    			   
+		          		//<button type='submit' onclick = 'confirmTeam()'>Confirm Team</button>
+		          	}
+		          	if(response.payload.currentProposal && (!response.payload.votes || !response.payload.votes[username])) {
+		         		showApproveReject(response.payload.currentProposal);
+		         		$('#listOfPlayersCheckbox').html('');
+		       			$('#confirmTeamButtonDiv').html('');
+		          	}
+
+		          	if(response.payload.missionVotePhase && (!response.payload.missionVotes || !response.payload.missionVotes[username])) {
+		          		var oldProposal = response.payload.oldProposal;
+		         		addMissionVotesIcons(oldProposal.playersSelected, oldProposal.playerVoteMap, response.payload.players);
+		         		$('#listOfPlayersCheckbox').html('');
+		       			$('#confirmTeamButtonDiv').html('');
+		          	}
+
+
+
+		          	updateBoardTiles(response.payload.gameProgress, response.payload.missionData);
+		          	updateRejectCountTiles(0);
+		          	updateTurnOrderTiles(response.payload.turnOrder, response.payload.currentKing);
+		          	if(response.payload.usingLadyOfLake) {
+		          		updateLadyTiles(response.payload.playersHadLady, response.payload.ladyHolder, response.payload.turnOrder);
+		          	}
+		          },
+		          error: function(xhr) {
+		            alert(xhr)
+		          }
+       		});
+        }
+    </script>
+    <body>
+    	<button type="submit" onclick=toggleIdentity() id="toggleIdentity"> Hide Identity </button>
+    	<h1 id = "welcomeMessage"> Welcome to avalon!</h1>
+    	<div id = "dashboard"> 
+    	</div>
+    	<br/> 
+    	<div id = "ladyInformation"> 
+    	</div>
+
+
+    	<div id='ladyCandidateSelection'> </div> <br>
+
+    	<div id='listCharactersInGameHeader' class='header'>Characters in Game (in no particular order)</div>
+    	<div id = "whoIsInGame"> </div>
+    	<br>
+
+    	</div>
+    	<div id = "turnInfo">
+	    	<div id="turnOrderHeader" class='header'>Turn Order</div>
+	    	<div id='turnOrder'></div>
+	    	<div id='ladyState'></div>
+    	</div>
+
+    	<div id = "previousMissionInfo">
+
+
+    	</div>
+
+    	<br/>
+    	<div id = "playerSelection">
+
+
+    	</div>
+
+    	<div id='listOfPlayersCheckbox'>
+    		
+    	
+    	</div>
+
+
+    	<div id='confirmTeamButtonDiv'></div>
+
+    	<br/><br/>
+    	<div id="boardStateHeader" class='header'>Board State</div>
+    	<div id='noteTiles'> </div>
+    	<div id='boardState'> </div>
+    
+
+    	<div id='rejectState'>
+    	</div>
+
+    	<br>
+
+    	<div id='chosen'></div> <br>
+
+    	<div id='vote'></div> <br>
+
+    	<div id='confirmVoteButtonDiv'></div> <br>
+
+    	 <div id='passFailVote'></div> <br>
+
+    	 <div id='confirmMissionVoteButtonDiv'> </div> <br>
+    	 <div id='currentVotes'> </div> <br>
+    	 <div id='votesForMission'> </div> <br>
+		 <div id="chooseMerlin"> </div> 
+
+    </body>
+
+</html>

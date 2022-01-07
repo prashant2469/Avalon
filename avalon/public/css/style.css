@@ -1,0 +1,109 @@
+.header {
+	font-size: 20px;
+	font-weight: bold;
+}
+
+.ladyTile {
+	display:inline-block;
+	width: 8.8vw;
+	height: 150px;
+	border: 3px solid black;
+	text-align: center;
+	vertical-align: middle;
+	white-space: pre-wrap;
+	font-weight: bold;
+	color: black;
+}
+
+.image-radio img {
+	width: 90px;
+	height: auto;
+}
+
+.ladyTile.green {
+	background: url('../assets/lady.png') no-repeat;
+	background-size: contain;
+	background-position: center;
+}
+
+.ladyTile.gray {
+	background: url('../assets/lady_gray.png') no-repeat;
+	background-size: contain;
+	background-position: center;
+}
+
+.turnOrderTile {
+	display:inline-block;
+	width: 8.8vw;
+	height: 20px;
+	border: 3px solid black;
+	text-align: center;
+	vertical-align: middle;
+	white-space: pre-wrap;
+	font-weight: bold;
+	color: black;
+}
+
+.turnOrderTile.selected {
+	background-color: cyan;
+}
+
+.notesTile {
+	display:inline-block;
+	width: 18vw;
+	height: 20px;
+	border: 3px solid white;
+	text-align: center;
+	vertical-align: middle;
+	white-space: pre-wrap;
+	font-weight: bold;
+	color: blue;
+}
+
+.tile {
+	display:inline-block;
+	width: 18vw;
+	border: 3px solid black;
+	text-align: center;
+	vertical-align: middle;
+	white-space: pre-wrap;
+}
+
+.tile.success {
+	background-color: green;
+}
+
+
+.tile.fail {
+	background-color: red;
+}
+
+.tile.not-reached {
+	display:inline-block;
+}
+
+.rejectCountTile {
+	display:inline-block;
+	width: 18vw;
+	height: 18px;
+	border: 3px solid black;
+	text-align: center;
+	vertical-align: middle;
+	white-space: pre-wrap;
+	padding-top: 0px
+}
+
+.rejectCountTile.reached {
+	background-color: red;
+}
+
+span.image-radio input[type="radio"]:checked + img{
+    border:1px solid red;
+}
+/*
+.tile.not-reached {
+	display:inline-block;
+	line-height: 170px;
+}
+
+*/
